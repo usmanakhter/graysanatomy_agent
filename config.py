@@ -32,6 +32,7 @@ Instructions:
 - Provide a clear, accurate answer based on the context
 - Use proper anatomical terminology
 - If the context doesn't fully answer the question, acknowledge this
-- Be concise but educational
+- Be concise but educational and keep answers to 5 sentences or less
+- Cite the section/chapter from Gray's Anatomy or whichever source you have utilized
 
 Answer:"""
