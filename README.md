@@ -9,6 +9,6 @@ Access on streamlit: https://graysanatomyagent.streamlit.app/
 
 Screenshot:
 
-<img src="images/grays_anatomy_cover.png" alt="Gray's Anatomy" width="300"/>
+<img src="img/graysagent_scrnshot.png" alt="Gray's Anatomy" width="300"/>
 
 
