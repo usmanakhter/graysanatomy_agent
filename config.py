@@ -14,7 +14,7 @@ CHUNK_OVERLAP = 150
 TOP_K_RESULTS = 5
 
 # Model selection
-USE_OPENAI = True  # Set to True to use OpenAI instead of HuggingFace
+USE_OPENAI = False  # Set to True to use OpenAI instead of HuggingFace
 LLM_MODEL = "mistralai/Mistral-7B-Instruct-v0.2"
 
 # File paths
