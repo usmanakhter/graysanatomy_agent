@@ -1,311 +1,276 @@
 import os
 import requests
 import streamlit as st
-from langchain_community.document_loaders import TextLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain.chains import RetrievalQA
-from langchain_community.llms import HuggingFaceHub
-from langchain.prompts import PromptTemplate
+import pickle
+from rank_bm25 import BM25Okapi
+import numpy as np
 
 # -------------------------------
-# Configuration
+# Configuration - MUCH FASTER
 # -------------------------------
-# Use smaller, faster model for Streamlit Cloud (limited resources)
-EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"  # Fast and good
-# Alternative: "BAAI/bge-base-en-v1.5" (medium size, better quality)
-
-LLM_MODEL = "mistralai/Mistral-7B-Instruct-v0.2"  # Faster than Mixtral
-# Alternative: "HuggingFaceH4/zephyr-7b-beta" (good quality)
-
-CHUNK_SIZE = 1500  # Larger for more context
-CHUNK_OVERLAP = 300  # More overlap
-RETRIEVAL_K = 5  # Number of chunks to retrieve
+USE_OPENAI = False  # Set to True if you want to use OpenAI (costs ~$0.01/query)
+CHUNK_SIZE = 1000
+CHUNK_OVERLAP = 150
 
 # -------------------------------
-# Step 0: Download Gray's Anatomy if not present
+# Fast BM25 Search (No embeddings needed!)
 # -------------------------------
 @st.cache_resource
-def download_text():
+def download_and_chunk_text():
+    """Download and split text into chunks - FAST"""
     filepath = "grays_anatomy.txt"
+    
     if not os.path.exists(filepath):
-        with st.spinner("Downloading Gray's Anatomy text..."):
-            url = "https://archive.org/stream/anatomyofhumanbo1918gray/anatomyofhumanbo1918gray_djvu.txt"
-            response = requests.get(url)
-            with open(filepath, "w", encoding="utf-8") as f:
-                f.write(response.text)
-    return filepath
-
-# -------------------------------
-# Step 1: Load and split text with better chunking
-# -------------------------------
-@st.cache_resource
-def load_and_split_documents():
-    filepath = download_text()
+        st.info("📥 Downloading Gray's Anatomy... (30 seconds)")
+        url = "https://archive.org/stream/anatomyofhumanbo1918gray/anatomyofhumanbo1918gray_djvu.txt"
+        response = requests.get(url, timeout=60)
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(response.text)
     
-    with st.spinner("Loading document..."):
-        loader = TextLoader(filepath, encoding="utf-8")
-        documents = loader.load()
+    with open(filepath, "r", encoding="utf-8") as f:
+        text = f.read()
     
-    with st.spinner("Splitting text into optimized chunks..."):
-        splitter = RecursiveCharacterTextSplitter(
-            chunk_size=CHUNK_SIZE,
-            chunk_overlap=CHUNK_OVERLAP,
-            separators=["\n\n", "\n", ". ", " ", ""],  # Better split points
-            length_function=len,
-        )
-        chunks = splitter.split_documents(documents)
+    # Simple chunking
+    chunks = []
+    for i in range(0, len(text), CHUNK_SIZE - CHUNK_OVERLAP):
+        chunk = text[i:i + CHUNK_SIZE]
+        if len(chunk) > 100:  # Skip tiny chunks
+            chunks.append(chunk)
     
     return chunks
 
-# -------------------------------
-# Step 2: Load or build FAISS vectorstore with better embeddings
-# -------------------------------
-@st.cache_resource(show_spinner=False)
-def load_vectorstore():
-    chunks = load_and_split_documents()
+@st.cache_resource
+def create_bm25_index():
+    """Create BM25 index - VERY FAST (1-2 minutes max)"""
+    st.info("🔨 Building search index... (1-2 minutes, one-time only)")
     
-    progress_text = st.empty()
-    progress_bar = st.progress(0)
+    chunks = download_and_chunk_text()
     
-    progress_text.text(f"Loading embeddings model ({EMBEDDING_MODEL})...")
-    progress_bar.progress(20)
+    # Tokenize for BM25
+    tokenized_chunks = [chunk.lower().split() for chunk in chunks]
     
-    hf_embeddings = HuggingFaceEmbeddings(
-        model_name=EMBEDDING_MODEL,
-        model_kwargs={'device': 'cpu'},
-        encode_kwargs={'normalize_embeddings': True}
-    )
+    # Create BM25 index
+    bm25 = BM25Okapi(tokenized_chunks)
     
-    progress_bar.progress(40)
+    # Cache it
+    with open("bm25_index.pkl", "wb") as f:
+        pickle.dump((bm25, chunks), f)
     
-    vectorstore_path = "grays_anatomy_vectorstore_v2"
-    
-    if os.path.exists(vectorstore_path):
-        progress_text.text("Loading existing vector store...")
-        progress_bar.progress(60)
-        vectorstore = FAISS.load_local(
-            vectorstore_path,
-            hf_embeddings,
-            allow_dangerous_deserialization=True
-        )
-        progress_bar.progress(100)
+    st.success(f"✅ Indexed {len(chunks)} chunks!")
+    return bm25, chunks
+
+@st.cache_resource
+def load_search_index():
+    """Load or create search index"""
+    if os.path.exists("bm25_index.pkl"):
+        with open("bm25_index.pkl", "rb") as f:
+            bm25, chunks = pickle.load(f)
+        return bm25, chunks
     else:
-        progress_text.text("Creating vector store (first time: ~5 minutes)...")
-        progress_bar.progress(60)
-        vectorstore = FAISS.from_documents(chunks, hf_embeddings)
-        progress_bar.progress(80)
-        vectorstore.save_local(vectorstore_path)
-        progress_bar.progress(100)
+        return create_bm25_index()
+
+def search_documents(query, k=5):
+    """Fast keyword search"""
+    bm25, chunks = load_search_index()
     
-    progress_text.empty()
-    progress_bar.empty()
+    # Tokenize query
+    tokenized_query = query.lower().split()
     
-    return vectorstore
+    # Get top k results
+    scores = bm25.get_scores(tokenized_query)
+    top_indices = np.argsort(scores)[-k:][::-1]
+    
+    results = [chunks[i] for i in top_indices]
+    return results
 
 # -------------------------------
-# Step 3: Initialize QA chain with LLM and custom prompt
+# LLM Options (Choose one)
 # -------------------------------
-@st.cache_resource(show_spinner=False)
-def initialize_qa_chain():
-    progress_text = st.empty()
-    progress_bar = st.progress(0)
+def get_llm_response(context, question):
+    """Get response from LLM"""
     
-    progress_text.text("Loading vector store...")
-    progress_bar.progress(10)
-    
-    vectorstore = load_vectorstore()
-    progress_bar.progress(50)
-    
-    # Check for API token
-    api_token = os.environ.get("HUGGINGFACEHUB_API_TOKEN")
-    if not api_token:
-        progress_text.empty()
-        progress_bar.empty()
-        st.error("⚠️ HUGGINGFACEHUB_API_TOKEN not found in environment variables!")
-        st.info("Get a free token at: https://huggingface.co/settings/tokens")
-        st.stop()
-    
-    progress_text.text(f"Initializing LLM ({LLM_MODEL})...")
-    progress_bar.progress(70)
-    
-    try:
-        llm = HuggingFaceHub(
-            repo_id=LLM_MODEL,
-            model_kwargs={
-                "temperature": 0.1,
-                "max_new_tokens": 500,
-                "top_k": 50,
-            },
-            huggingfacehub_api_token=api_token
-        )
-        progress_bar.progress(90)
-    except Exception as e:
-        progress_text.empty()
-        progress_bar.empty()
-        st.error(f"❌ Error connecting to HuggingFace: {str(e)}")
-        st.info("Check if your API token is valid and has not exceeded rate limits.")
-        st.stop()
-    
-    # Custom prompt for better medical answers
-    template = """You are an expert anatomist with deep knowledge of Gray's Anatomy. Use the following excerpts from Gray's Anatomy (1918 edition) to answer the question accurately and educationally.
+    if USE_OPENAI:
+        # Option 1: OpenAI (best quality, costs ~$0.01/query)
+        from openai import OpenAI
+        client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        
+        prompt = f"""Based on the following excerpts from Gray's Anatomy, answer the question accurately.
 
-Context from Gray's Anatomy:
+Context:
 {context}
 
 Question: {question}
 
-Instructions:
-- Provide a clear, accurate, and educational answer based on the context above
-- Cite specific anatomical structures, regions, or systems mentioned in the text
-- Use proper medical terminology while remaining accessible
-- If the context doesn't contain enough information to fully answer the question, acknowledge this
-- Structure your answer logically (e.g., definition, location, structure, function, clinical relevance)
+Answer concisely and educationally:"""
+        
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1,
+            max_tokens=500
+        )
+        return response.choices[0].message.content
+    
+    else:
+        # Option 2: Free HuggingFace (but faster API)
+        api_token = os.environ.get("HUGGINGFACEHUB_API_TOKEN")
+        
+        if not api_token:
+            st.error("❌ Set HUGGINGFACEHUB_API_TOKEN in Streamlit secrets")
+            st.stop()
+        
+        # Use HuggingFace Inference API (faster than loading models)
+        API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2"
+        headers = {"Authorization": f"Bearer {api_token}"}
+        
+        prompt = f"""<s>[INST] Based on the following excerpts from Gray's Anatomy, answer the question accurately and concisely.
 
-Answer:"""
+Context from Gray's Anatomy:
+{context[:3000]}
 
-    PROMPT = PromptTemplate(
-        template=template,
-        input_variables=["context", "question"]
-    )
-    
-    progress_text.text("Creating QA chain...")
-    # Create QA chain
-    qa_chain = RetrievalQA.from_chain_type(
-        llm=llm,
-        chain_type="stuff",
-        retriever=vectorstore.as_retriever(
-            search_type="similarity",
-            search_kwargs={"k": RETRIEVAL_K}
-        ),
-        return_source_documents=True,
-        chain_type_kwargs={"prompt": PROMPT}
-    )
-    
-    progress_bar.progress(100)
-    progress_text.empty()
-    progress_bar.empty()
-    
-    return qa_chain
+Question: {question}
+
+Provide a clear, educational answer: [/INST]"""
+        
+        payload = {
+            "inputs": prompt,
+            "parameters": {
+                "max_new_tokens": 400,
+                "temperature": 0.1,
+                "top_p": 0.9,
+                "return_full_text": False
+            }
+        }
+        
+        response = requests.post(API_URL, headers=headers, json=payload, timeout=30)
+        
+        if response.status_code == 200:
+            result = response.json()
+            if isinstance(result, list) and len(result) > 0:
+                return result[0].get("generated_text", "Error generating response")
+            return str(result)
+        else:
+            return f"Error: {response.status_code} - {response.text}"
 
 # -------------------------------
-# Step 4: Streamlit UI
+# Streamlit UI
 # -------------------------------
 st.set_page_config(page_title="Gray's Anatomy AI", layout="wide", page_icon="🧠")
 
-# Header
-st.title("🧠 Gray's Anatomy AI Assistant")
+st.title("🧠 Gray's Anatomy AI Assistant (Fast Version)")
 st.markdown("""
-Ask questions about human anatomy based on the complete text of **Gray's Anatomy (1918 edition)**.
-This AI uses advanced retrieval and language models to provide accurate, educational answers.
+Ask questions about human anatomy based on **Gray's Anatomy (1918)**.
+Uses **BM25 keyword search** (no heavy embeddings) + LLM for answers.
 """)
 
-# Initialize the QA chain
-try:
-    qa_chain = initialize_qa_chain()
-    st.success("✅ System ready! Ask your anatomy questions below.")
-except Exception as e:
-    st.error(f"❌ Error initializing system: {str(e)}")
-    st.stop()
-
-# Sidebar with info and examples
+# Sidebar
 with st.sidebar:
-    st.header("ℹ️ About")
-    st.markdown(f"""
-    **Powered by:**
-    - 🤖 {LLM_MODEL.split('/')[-1]}
-    - 🔍 {EMBEDDING_MODEL.split('/')[-1]}
-    - 📚 Complete Gray's Anatomy text
-    - ⚡ FAISS vector search
+    st.header("⚡ Fast Mode Features")
+    st.markdown("""
+    **Why this is faster:**
+    - ✅ BM25 keyword search (no embeddings)
+    - ✅ Lightweight indexing (~2 min first time)
+    - ✅ Direct API calls (no model loading)
+    - ✅ Simple chunking
+    
+    **Trade-offs:**
+    - Keyword-based (not semantic)
+    - Good for specific terms
+    - May miss conceptual matches
     """)
     
     st.markdown("---")
     
-    # Show system status
-    if os.path.exists("grays_anatomy_vectorstore_v2"):
-        st.success("✅ Vector store ready")
+    # Check status
+    if os.path.exists("bm25_index.pkl"):
+        st.success("✅ Search index ready")
     else:
-        st.warning("⏳ First run will take ~5 min")
+        st.warning("⏳ First run: ~2 minutes")
+    
+    if os.environ.get("HUGGINGFACEHUB_API_TOKEN"):
+        st.success("✅ API token configured")
+    elif os.environ.get("OPENAI_API_KEY"):
+        st.success("✅ OpenAI key configured")
+    else:
+        st.error("❌ No API key found")
     
     st.markdown("---")
-    
     st.header("💡 Example Questions")
-    examples = [
-        "What are the main bones of the skull?",
-        "Describe the structure of the heart",
-        "What muscles are involved in breathing?",
-        "Explain the layers of the skin",
-        "What is the function of the cerebellum?",
-        "Describe the structure of a long bone",
-        "What are the parts of the digestive system?",
-        "Explain the vertebral column",
-        "What are the chambers of the heart?",
-        "Describe the brachial plexus"
-    ]
     
-    for ex in examples:
-        if st.sidebar.button(ex, key=f"example_{ex[:20]}"):
-            st.session_state.clicked_example = ex
+    examples = [
+        "What are the bones of the skull?",
+        "Describe the heart chambers",
+        "What is the brachial plexus?",
+        "Explain the vertebral column",
+        "What muscles control breathing?",
+        "Describe the liver structure",
+        "What are the cranial nerves?",
+        "Explain the knee joint"
+    ]
+
+# Initialize
+try:
+    bm25, chunks = load_search_index()
+    st.success(f"✅ Ready! Searching {len(chunks):,} text chunks")
+except Exception as e:
+    st.error(f"❌ Error loading search index: {e}")
+    st.stop()
 
 # Initialize chat history
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
-# Main input area
+# Input
 col1, col2 = st.columns([5, 1])
 with col1:
-    user_question = st.text_input(
-        "Ask a question about anatomy:",
-        value=st.session_state.get("clicked_example", ""),
-        key="user_input"
-    )
-    if "clicked_example" in st.session_state:
-        del st.session_state.clicked_example
-
+    user_question = st.text_input("Ask a question about anatomy:", key="user_input")
 with col2:
-    st.write("")  # Spacing
-    ask_button = st.button("🔍 Ask", type="primary", use_container_width=True)
+    st.write("")
+    ask_button = st.button("🔍 Ask", type="primary")
 
 # Clear button
-if st.button("🗑️ Clear Conversation"):
+if st.button("🗑️ Clear"):
     st.session_state.chat_history = []
     st.rerun()
 
+# Example buttons in sidebar
+for ex in examples:
+    if st.sidebar.button(ex, key=f"ex_{ex[:20]}"):
+        user_question = ex
+        ask_button = True
+
 # Process question
-if (ask_button or user_question) and user_question.strip():
-    with st.spinner("🤔 Thinking..."):
+if ask_button and user_question and user_question.strip():
+    with st.spinner("🔍 Searching... 🤔 Thinking..."):
         try:
-            result = qa_chain.invoke({"query": user_question})
-            answer = result["result"]
-            source_docs = result["source_documents"]
+            # Search for relevant chunks
+            relevant_chunks = search_documents(user_question, k=5)
+            context = "\n\n".join(relevant_chunks)
             
-            # Add to chat history
+            # Get LLM response
+            answer = get_llm_response(context, user_question)
+            
+            # Save to history
             st.session_state.chat_history.append({
                 "question": user_question,
-                "answer": answer,
-                "num_sources": len(source_docs)
+                "answer": answer
             })
             
         except Exception as e:
             st.error(f"❌ Error: {str(e)}")
 
-# Display chat history (most recent first)
+# Display chat history
 st.markdown("---")
 if st.session_state.chat_history:
-    for i, chat in enumerate(reversed(st.session_state.chat_history)):
-        with st.container():
-            st.markdown(f"### ❓ {chat['question']}")
-            st.markdown(chat['answer'])
-            st.caption(f"📚 Answer based on {chat['num_sources']} relevant sections from Gray's Anatomy")
-            st.markdown("---")
+    for chat in reversed(st.session_state.chat_history):
+        st.markdown(f"### ❓ {chat['question']}")
+        st.markdown(chat['answer'])
+        st.markdown("---")
 else:
-    st.info("👆 Ask a question above or click an example from the sidebar to get started!")
+    st.info("👆 Ask a question to get started!")
 
 # Footer
-st.markdown("---")
 st.caption("""
-⚠️ **Note:** This AI uses the 1918 edition of Gray's Anatomy. While anatomical fundamentals remain accurate,
-medical terminology and some concepts may reflect the knowledge of that era. Always consult current medical 
-resources for clinical decisions.
+⚠️ **Note:** Uses Gray's Anatomy (1918). Fast keyword search may miss some semantic matches.
+For better semantic understanding, upgrade to the full vector store version.
 """)

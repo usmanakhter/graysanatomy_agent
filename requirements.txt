@@ -1,7 +1,5 @@
 streamlit
-langchain
-langchain-community
-faiss-cpu
-sentence-transformers>=2.2.0
-huggingface-hub
+rank-bm25
+numpy
 requests
+openai  # Optional, only if using OpenAI
