@@ -1,0 +1,10 @@
+gradio>=3.40
+langchain>=0.1
+langchain-community>=0.0.187
+langchain-huggingface>=0.0.25
+sentence-transformers>=2.2.2
+torch>=2.0.1
+faiss-cpu>=1.7.4
+requests>=2.31
+numpy>=1.25
+tqdm>=4.66
