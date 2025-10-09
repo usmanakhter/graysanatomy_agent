@@ -1,7 +1,6 @@
 """
 LLM interaction - supports HuggingFace and OpenAI
 """
-from dotenv import load_dotenv
 import os
 import requests
 from config import USE_OPENAI, LLM_MODEL, PROMPT_TEMPLATE
