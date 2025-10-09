@@ -1,9 +1,7 @@
-streamlit>=1.30
-langchain>=0.1
-langchain-community>=0.0.187
-sentence-transformers>=2.2.2
-torch>=2.0.1
-faiss-cpu>=1.7.4
-requests>=2.31
-numpy>=1.25
-tqdm>=4.66
+streamlit
+langchain
+langchain-community
+faiss-cpu
+sentence-transformers>=2.2.0
+huggingface-hub
+requests

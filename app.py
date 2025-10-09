@@ -1,18 +1,18 @@
 import os
 import requests
 import streamlit as st
-from langchain.document_loaders import TextLoader
+from langchain_community.document_loaders import TextLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.vectorstores import FAISS
-from langchain.embeddings import HuggingFaceEmbeddings
+from langchain_community.vectorstores import FAISS
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain.chains import RetrievalQA
-from langchain_huggingface import HuggingFaceEndpoint
+from langchain_community.llms import HuggingFaceHub
 from langchain.prompts import PromptTemplate
 
 # -------------------------------
 # Configuration
 # -------------------------------
-EMBEDDING_MODEL = "BAAI/bge-large-en-v1.5"  
+EMBEDDING_MODEL = "BAAI/bge-large-en-v1.5"  # Much better than all-MiniLM-L6-v2
 LLM_MODEL = "mistralai/Mixtral-8x7B-Instruct-v0.1"  # Powerful model
 CHUNK_SIZE = 1500  # Larger for more context
 CHUNK_OVERLAP = 300  # More overlap
@@ -33,7 +33,7 @@ def download_text():
     return filepath
 
 # -------------------------------
-# Step 1: Load and split text with chunking
+# Step 1: Load and split text with better chunking
 # -------------------------------
 @st.cache_resource
 def load_and_split_documents():
@@ -119,7 +119,6 @@ Instructions:
 - Provide a clear, accurate, and educational answer based on the context above
 - Cite specific anatomical structures, regions, or systems mentioned in the text
 - Use proper medical terminology while remaining accessible
-- If possible, cite the relevant section or chapter from Gray's Anatomy
 - If the context doesn't contain enough information to fully answer the question, acknowledge this
 - Structure your answer logically (e.g., definition, location, structure, function, clinical relevance)
 
