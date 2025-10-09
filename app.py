@@ -1,13 +1,13 @@
 import os
 import requests
-import gradio as gr
+import streamlit as st
 from langchain.document_loaders import TextLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import FAISS
 from langchain.embeddings import HuggingFaceEmbeddings
 
 # -------------------------------
-# Step 0: Download Gray's Anatomy
+# Step 0: Download Gray's Anatomy if not present
 # -------------------------------
 filepath = "grays_anatomy.txt"
 if not os.path.exists(filepath):
@@ -20,7 +20,7 @@ else:
     print("✓ Gray's Anatomy already exists!")
 
 # -------------------------------
-# Step 1: Load & split text
+# Step 1: Load and split text
 # -------------------------------
 loader = TextLoader(filepath, encoding="utf-8")
 documents = loader.load()
@@ -29,7 +29,7 @@ chunks = splitter.split_documents(documents)
 print(f"✓ Text split into {len(chunks)} chunks")
 
 # -------------------------------
-# Step 2: Build or load FAISS vector store
+# Step 2: Load or build FAISS vectorstore
 # -------------------------------
 hf_embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
@@ -46,59 +46,47 @@ else:
     print("✓ Created and saved FAISS vector store")
 
 # -------------------------------
-# Step 3: Define embeddings-only QA
+# Step 3: Streamlit UI
 # -------------------------------
-def answer_question_no_llm(question, k=4):
-    docs = vectorstore.similarity_search(question, k=k)
-    answer_text = "\n\n".join([d.page_content for d in docs])
-    return answer_text[:2000]  # truncate for display
+st.set_page_config(page_title="Gray's Anatomy AI", layout="wide")
+st.title("🧠 Gray's Anatomy FAQ Agent")
+st.markdown("Ask questions about human anatomy based on Gray's Anatomy (1918).")
 
-def chat_fn(question, chat_history):
-    answer = answer_question_no_llm(question)
-    chat_history.append((question, answer))
-    return "", chat_history
+# Initialize chat history
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 
-# -------------------------------
-# Step 4: Build Gradio UI
-# -------------------------------
-with gr.Blocks(theme=gr.themes.Soft(), title="Gray's Anatomy AI") as demo:
-    gr.Markdown(
-        "# 🧠 Gray's Anatomy FAQ Agent\nAsk questions about human anatomy based on Gray's Anatomy (1918)."
-    )
+# Input question
+user_question = st.text_input("Ask a question about anatomy:")
 
-    with gr.Row():
-        with gr.Column(scale=2):
-            chatbot = gr.Chatbot(height=500, label="Conversation")
-            question_input = gr.Textbox(
-                placeholder="Ask about anatomy...",
-                label="Your Question",
-                lines=2
-            )
-            submit_btn = gr.Button("Ask", variant="primary")
-            clear_btn = gr.Button("Clear Conversation")
+# Submit button
+if st.button("Ask") and user_question.strip():
+    docs = vectorstore.similarity_search(user_question, k=4)
+    answer = "\n\n".join([d.page_content for d in docs])[:2000]  # truncate for display
+    st.session_state.chat_history.append((user_question, answer))
 
-        with gr.Column(scale=1):
-            gr.Markdown("### 💡 Example Questions")
-            examples = [
-                "What are the main bones of the skull?",
-                "Describe the structure of the heart",
-                "What muscles are involved in breathing?",
-                "Explain the layers of the skin",
-                "What is the function of the cerebellum?",
-                "Describe the structure of a long bone",
-                "What are the parts of the digestive system?",
-                "Explain the vertebral column"
-            ]
-            for ex in examples:
-                btn = gr.Button(ex, size="sm")
-                btn.click(lambda x=ex: x, outputs=question_input)
+# Clear conversation
+if st.button("Clear Conversation"):
+    st.session_state.chat_history = []
 
-    submit_btn.click(chat_fn, inputs=[question_input, chatbot], outputs=[question_input, chatbot])
-    question_input.submit(chat_fn, inputs=[question_input, chatbot], outputs=[question_input, chatbot])
-    clear_btn.click(lambda: ("", []), None, chatbot)
+# Display chat history
+for q, a in st.session_state.chat_history:
+    st.markdown(f"**Q:** {q}")
+    st.markdown(f"**A:** {a}")
+    st.markdown("---")
 
-# -------------------------------
-# Step 5: Launch
-# -------------------------------
-if __name__ == "__main__":
-    demo.launch()
+# Optional: sidebar examples
+st.sidebar.header("💡 Example Questions")
+examples = [
+    "What are the main bones of the skull?",
+    "Describe the structure of the heart",
+    "What muscles are involved in breathing?",
+    "Explain the layers of the skin",
+    "What is the function of the cerebellum?",
+    "Describe the structure of a long bone",
+    "What are the parts of the digestive system?",
+    "Explain the vertebral column"
+]
+for ex in examples:
+    if st.sidebar.button(ex):
+        st.session_state.chat_history.append((ex, "\n\n".join([d.page_content for d in vectorstore.similarity_search(ex, k=4)])[:2000]))
