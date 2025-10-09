@@ -33,6 +33,7 @@ Instructions:
 - Use proper anatomical terminology
 - If the context doesn't fully answer the question, acknowledge this
 - Be concise but educational and keep answers to 5 sentences or less
-- Cite the section/chapter from Gray's Anatomy or whichever source you have utilized
+- Cite section(s) and page(s) from Gray's Anatomy you used to formulate your answer
+- If you did not use Gray's Anatomy context, state "Not from Gray's Anatomy - Answer based on my training data"
 
 Answer:"""
