@@ -12,8 +12,13 @@ from langchain.prompts import PromptTemplate
 # -------------------------------
 # Configuration
 # -------------------------------
-EMBEDDING_MODEL = "BAAI/bge-large-en-v1.5"  # Much better than all-MiniLM-L6-v2
-LLM_MODEL = "mistralai/Mixtral-8x7B-Instruct-v0.1"  # Powerful model
+# Use smaller, faster model for Streamlit Cloud (limited resources)
+EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"  # Fast and good
+# Alternative: "BAAI/bge-base-en-v1.5" (medium size, better quality)
+
+LLM_MODEL = "mistralai/Mistral-7B-Instruct-v0.2"  # Faster than Mixtral
+# Alternative: "HuggingFaceH4/zephyr-7b-beta" (good quality)
+
 CHUNK_SIZE = 1500  # Larger for more context
 CHUNK_OVERLAP = 300  # More overlap
 RETRIEVAL_K = 5  # Number of chunks to retrieve
@@ -57,55 +62,91 @@ def load_and_split_documents():
 # -------------------------------
 # Step 2: Load or build FAISS vectorstore with better embeddings
 # -------------------------------
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def load_vectorstore():
     chunks = load_and_split_documents()
     
-    with st.spinner(f"Loading embeddings model ({EMBEDDING_MODEL})..."):
-        hf_embeddings = HuggingFaceEmbeddings(
-            model_name=EMBEDDING_MODEL,
-            model_kwargs={'device': 'cpu'},
-            encode_kwargs={'normalize_embeddings': True}  # Improves retrieval
-        )
+    progress_text = st.empty()
+    progress_bar = st.progress(0)
     
-    vectorstore_path = "grays_anatomy_vectorstore_v2"  # New version with better embeddings
+    progress_text.text(f"Loading embeddings model ({EMBEDDING_MODEL})...")
+    progress_bar.progress(20)
+    
+    hf_embeddings = HuggingFaceEmbeddings(
+        model_name=EMBEDDING_MODEL,
+        model_kwargs={'device': 'cpu'},
+        encode_kwargs={'normalize_embeddings': True}
+    )
+    
+    progress_bar.progress(40)
+    
+    vectorstore_path = "grays_anatomy_vectorstore_v2"
     
     if os.path.exists(vectorstore_path):
-        with st.spinner("Loading vector store..."):
-            vectorstore = FAISS.load_local(
-                vectorstore_path,
-                hf_embeddings,
-                allow_dangerous_deserialization=True
-            )
+        progress_text.text("Loading existing vector store...")
+        progress_bar.progress(60)
+        vectorstore = FAISS.load_local(
+            vectorstore_path,
+            hf_embeddings,
+            allow_dangerous_deserialization=True
+        )
+        progress_bar.progress(100)
     else:
-        with st.spinner("Creating vector store (this will take a few minutes)..."):
-            vectorstore = FAISS.from_documents(chunks, hf_embeddings)
-            vectorstore.save_local(vectorstore_path)
+        progress_text.text("Creating vector store (first time: ~5 minutes)...")
+        progress_bar.progress(60)
+        vectorstore = FAISS.from_documents(chunks, hf_embeddings)
+        progress_bar.progress(80)
+        vectorstore.save_local(vectorstore_path)
+        progress_bar.progress(100)
+    
+    progress_text.empty()
+    progress_bar.empty()
     
     return vectorstore
 
 # -------------------------------
 # Step 3: Initialize QA chain with LLM and custom prompt
 # -------------------------------
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def initialize_qa_chain():
+    progress_text = st.empty()
+    progress_bar = st.progress(0)
+    
+    progress_text.text("Loading vector store...")
+    progress_bar.progress(10)
+    
     vectorstore = load_vectorstore()
+    progress_bar.progress(50)
     
     # Check for API token
     api_token = os.environ.get("HUGGINGFACEHUB_API_TOKEN")
     if not api_token:
+        progress_text.empty()
+        progress_bar.empty()
         st.error("⚠️ HUGGINGFACEHUB_API_TOKEN not found in environment variables!")
         st.info("Get a free token at: https://huggingface.co/settings/tokens")
         st.stop()
     
-    with st.spinner(f"Initializing LLM ({LLM_MODEL})..."):
-        llm = HuggingFaceEndpoint(
+    progress_text.text(f"Initializing LLM ({LLM_MODEL})...")
+    progress_bar.progress(70)
+    
+    try:
+        llm = HuggingFaceHub(
             repo_id=LLM_MODEL,
-            temperature=0.1,  # Low temperature for factual answers
-            max_new_tokens=500,
-            top_k=50,
+            model_kwargs={
+                "temperature": 0.1,
+                "max_new_tokens": 500,
+                "top_k": 50,
+            },
             huggingfacehub_api_token=api_token
         )
+        progress_bar.progress(90)
+    except Exception as e:
+        progress_text.empty()
+        progress_bar.empty()
+        st.error(f"❌ Error connecting to HuggingFace: {str(e)}")
+        st.info("Check if your API token is valid and has not exceeded rate limits.")
+        st.stop()
     
     # Custom prompt for better medical answers
     template = """You are an expert anatomist with deep knowledge of Gray's Anatomy. Use the following excerpts from Gray's Anatomy (1918 edition) to answer the question accurately and educationally.
@@ -129,6 +170,7 @@ Answer:"""
         input_variables=["context", "question"]
     )
     
+    progress_text.text("Creating QA chain...")
     # Create QA chain
     qa_chain = RetrievalQA.from_chain_type(
         llm=llm,
@@ -140,6 +182,10 @@ Answer:"""
         return_source_documents=True,
         chain_type_kwargs={"prompt": PROMPT}
     )
+    
+    progress_bar.progress(100)
+    progress_text.empty()
+    progress_bar.empty()
     
     return qa_chain
 
@@ -166,13 +212,21 @@ except Exception as e:
 # Sidebar with info and examples
 with st.sidebar:
     st.header("ℹ️ About")
-    st.markdown("""
+    st.markdown(f"""
     **Powered by:**
-    - 🤖 Mixtral-8x7B (LLM)
-    - 🔍 BGE-Large embeddings
+    - 🤖 {LLM_MODEL.split('/')[-1]}
+    - 🔍 {EMBEDDING_MODEL.split('/')[-1]}
     - 📚 Complete Gray's Anatomy text
     - ⚡ FAISS vector search
     """)
+    
+    st.markdown("---")
+    
+    # Show system status
+    if os.path.exists("grays_anatomy_vectorstore_v2"):
+        st.success("✅ Vector store ready")
+    else:
+        st.warning("⏳ First run will take ~5 min")
     
     st.markdown("---")
     
