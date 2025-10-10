@@ -16,7 +16,7 @@ graysanatomy_agent/
 └── graysanatomy_agent.ipynb  # Notebook for experimentation
 
 ```
-Tools:
+**Tools:**
 Streamlit — web interface
 
 OpenAI GPT-3.5 — language model
@@ -25,9 +25,9 @@ Rank-BM25 — text retrieval
 
 Python Requests / dotenv — API integration and config handling
 
-Access on streamlit: https://graysanatomyagent.streamlit.app/
+**Access on streamlit**: https://graysanatomyagent.streamlit.app/
 
-Screenshot:
+**Screenshot:**
 
 <img src="img/graysagent_scrnshot.png" alt="Gray's Anatomy" width="300"/>
 
