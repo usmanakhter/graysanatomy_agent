@@ -10,78 +10,58 @@ LLM_OPTIONS = {
     "gpt-4o-mini": {
         "provider": "openai",
         "model": "gpt-4o-mini",
-        "description": "Most capable GPT model",
-        "context_length": 8192,
-        "speed": "medium",
-        "requires_key": "openai_api_key",
-        "key_url": "https://platform.openai.com/api-keys"
+        "description": "Fast, cost-effective ($0.15/1M tokens)",
+        "context_length": 128000,
+        "speed": "fast"
     },
-    "gpt-3.5-turbo": {
+    "gpt-4o": {
         "provider": "openai",
-        "model": "gpt-3.5-turbo",
-        "description": "Fast and cost-effective",
-        "context_length": 4096,
-        "speed": "fast",
-        "requires_key": "openai_api_key",
-        "key_url": "https://platform.openai.com/api-keys"
+        "model": "gpt-4o",
+        "description": "Most capable ($2.50/1M tokens)",
+        "context_length": 128000,
+        "speed": "medium"
     },
-    "claude-3-opus": {
+    "claude-3-5-sonnet": {
         "provider": "anthropic",
-        "model": "claude-3-opus-20240229",
-        "description": "Most capable Claude model",
-        "context_length": 4096,
-        "speed": "medium",
-        "requires_key": "anthropic_api_key",
-        "key_url": "https://console.anthropic.com/settings/keys"
+        "model": "claude-3-5-sonnet-20241022",
+        "description": "Excellent reasoning ($3/1M tokens)",
+        "context_length": 200000,
+        "speed": "medium"
     },
-    "claude-3-sonnet": {
+    "claude-3-5-haiku": {
         "provider": "anthropic",
-        "model": "claude-3-sonnet-20240229",
-        "description": "Fast and cost-effective",
-        "context_length": 4096,
-        "speed": "fast",
-        "requires_key": "anthropic_api_key",
-        "key_url": "https://console.anthropic.com/settings/keys"
+        "model": "claude-3-5-haiku-20241022",
+        "description": "Fast and affordable ($0.80/1M tokens)",
+        "context_length": 200000,
+        "speed": "fast"
     }
 }
 
-DEFAULT_LLM = "gpt-3.5-turbo"
+DEFAULT_LLM = "gpt-4o-mini"
 
 # ============================================
 # EMBEDDING OPTIONS (for semantic search)
+# LIGHTWEIGHT - NO PYTORCH!
 # ============================================
 EMBEDDING_OPTIONS = {
-    "minilm": {
-        "model_name": "sentence-transformers/all-MiniLM-L6-v2",
-        "description": "Fast, lightweight (80MB)",
-        "dimension": 384,
+    "tfidf": {
+        "model_name": "sklearn-tfidf",
+        "description": "TF-IDF vectors (LIGHTWEIGHT - 10MB, no PyTorch!)",
+        "dimension": 1000,
         "speed": "very fast",
-        "size_mb": 80
+        "size_mb": 10
     },
-    "bge-small": {
-        "model_name": "BAAI/bge-small-en-v1.5",
-        "description": "Better quality, small (133MB)",
-        "dimension": 384,
+    "openai-small": {
+        "model_name": "text-embedding-3-small",
+        "description": "OpenAI API ($0.02/1M tokens, no local model)",
+        "dimension": 1536,
         "speed": "fast",
-        "size_mb": 133
-    },
-    "bge-base": {
-        "model_name": "BAAI/bge-base-en-v1.5",
-        "description": "Strong performance, cost effective",
-        "dimension": 768,
-        "speed": "medium",
-        "size_mb": 438
-    },
-    "bge-large": {
-        "model_name": "BAAI/bge-large-en-v1.5",
-        "description": "Best quality (1.34GB)",
-        "dimension": 1024,
-        "speed": "slow",
-        "size_mb": 1340
+        "size_mb": 0,  # API-based
+        "provider": "openai"
     }
 }
 
-DEFAULT_EMBEDDING = "bge-base"
+DEFAULT_EMBEDDING = "tfidf"  # FREE and super lightweight!
 
 # ============================================
 # SEARCH STRATEGY OPTIONS

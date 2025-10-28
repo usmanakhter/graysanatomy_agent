@@ -1,21 +1,28 @@
-# Core dependencies
+# Core dependencies - LIGHTWEIGHT
 streamlit>=1.28.0
 requests>=2.31.0
 python-dotenv>=1.0.0
 numpy>=1.24.0
 
-# Search - Lexical (BM25)
+# Search - Lexical (BM25) - VERY LIGHT
 rank-bm25>=0.2.2
 
-# Search - Semantic (FAISS + Embeddings)
-sentence-transformers>=2.2.0
-faiss-cpu>=1.7.4
+# Search - Semantic WITHOUT PyTorch
+scikit-learn>=1.3.0  # For TF-IDF vectors (only ~50MB!)
+
+# Alternative: Use OpenAI embeddings (API-based, no local model)
+# This way you avoid PyTorch entirely!
 
 # LLMs
 openai>=1.0.0
 anthropic>=0.25.0
 
-# Future: Knowledge Graph (Slice 4)
-# spacy>=3.7.0
-# networkx>=3.1
-# neo4j>=5.14.0
+# OPTION: If you really want local embeddings on 8GB RAM:
+# Use ONNX Runtime (much lighter than PyTorch)
+# onnxruntime>=1.16.0
+# optimum[onnxruntime]>=1.16.0
+
+# NOT INCLUDED (too heavy for 8GB RAM):
+# sentence-transformers  # Needs PyTorch (~2GB)
+# torch  # Too heavy (~2GB)
+# faiss-cpu  # Needs numpy compatibility
