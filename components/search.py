@@ -87,7 +87,7 @@ class SearchEngine:
     def _load_vector_store(self):
         """Load or create lightweight vector store (TF-IDF or OpenAI)"""
         from data.loader import load_and_chunk
-        from components.embeddings_lightweight import EmbeddingManager
+        from components.embeddings import EmbeddingManager
         from config import VECTOR_STORE_DIR
         
         os.makedirs(VECTOR_STORE_DIR, exist_ok=True)

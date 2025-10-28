@@ -1,5 +1,5 @@
-from .search_lightweight import SearchEngine
+from .search import SearchEngine
 from .llm_hub import LLMHub
-from .embeddings_lightweight import EmbeddingManager
+from .embeddings import EmbeddingManager
 
 __all__ = ['SearchEngine', 'LLMHub', 'EmbeddingManager']
