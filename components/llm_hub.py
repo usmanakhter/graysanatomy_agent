@@ -27,7 +27,8 @@ class LLMHub:
         self.model_config = LLM_OPTIONS[model_name]
         self.provider = self.model_config["provider"]
         self.model_id = self.model_config["model"]
-        self.api_key = kwargs.get(self.model_config["requires_key"])
+        key_name = self.model_config.get("requires_key")
+        self.api_key = kwargs.get(key_name) if key_name else None
         
         # Initialize appropriate client
         if self.provider == "openai":

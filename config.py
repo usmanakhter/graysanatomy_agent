@@ -12,28 +12,36 @@ LLM_OPTIONS = {
         "model": "gpt-4o-mini",
         "description": "Fast, cost-effective ($0.15/1M tokens)",
         "context_length": 128000,
-        "speed": "fast"
+        "speed": "fast",
+        "requires_key": "OPENAI_API_KEY",
+        "key_url": "https://platform.openai.com/api-keys"
     },
     "gpt-4o": {
         "provider": "openai",
         "model": "gpt-4o",
         "description": "Most capable ($2.50/1M tokens)",
         "context_length": 128000,
-        "speed": "medium"
+        "speed": "medium",
+        "requires_key": "OPENAI_API_KEY",
+        "key_url": "https://platform.openai.com/api-keys"
     },
     "claude-3-5-sonnet": {
         "provider": "anthropic",
         "model": "claude-3-5-sonnet-20241022",
         "description": "Excellent reasoning ($3/1M tokens)",
         "context_length": 200000,
-        "speed": "medium"
+        "speed": "medium",
+        "requires_key": "ANTHROPIC_API_KEY",
+        "key_url": "https://console.anthropic.com/settings/keys"
     },
     "claude-3-5-haiku": {
         "provider": "anthropic",
         "model": "claude-3-5-haiku-20241022",
         "description": "Fast and affordable ($0.80/1M tokens)",
         "context_length": 200000,
-        "speed": "fast"
+        "speed": "fast",
+        "requires_key": "ANTHROPIC_API_KEY",
+        "key_url": "https://console.anthropic.com/settings/keys"
     }
 }
 

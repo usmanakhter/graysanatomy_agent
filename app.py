@@ -55,15 +55,22 @@ col1, col2 = st.columns([4, 1])
 with col1:
     # Check if example was selected
     default_question = ""
+    auto_ask = False
     if "selected_example" in st.session_state:
         default_question = st.session_state.selected_example
+        auto_ask = True
         del st.session_state.selected_example
+    
+    def handle_enter():
+        if st.session_state.question_input.strip():
+            st.session_state.auto_ask = True
     
     question = st.text_input(
         "Your question:",
         value=default_question,
         placeholder="e.g., What are the main bones of the skull?",
-        key="question_input"
+        key="question_input",
+        on_change=handle_enter
     )
 
 with col2:
@@ -259,9 +266,9 @@ with st.sidebar:
     # Example questions
     st.subheader("💡 Example Questions")
     examples = [
-        "What are the bones of the skull?",
-        "Describe the structure of the heart",
-        "What muscles control breathing?"
+        "WWhat are the sympathetic efferent fibers?",
+        "What protects the skull?",
+        "Why does my leg hurt in the back?"
     ]
     
     for i, example in enumerate(examples):
@@ -269,8 +276,7 @@ with st.sidebar:
             st.session_state.selected_example = example
 
 # Initialize orchestrator with current settings
-@st.cache_resource
-def get_orchestrator(_llm, _search, _embedding, _k):
+def get_orchestrator(_llm, _search, _embedding, _k, _api_keys):
     """Initialize orchestrator with current settings"""
     settings = {
         "llm": _llm,
@@ -280,75 +286,76 @@ def get_orchestrator(_llm, _search, _embedding, _k):
         "knowledge_graph": "none",
     }
     
-    # Get API keys from session state or environment
-    for model_config in LLM_OPTIONS.values():
-        if model_config["requires_key"]:
-            key_name = model_config["requires_key"]
-            api_key = (st.session_state.api_keys.get(key_name) 
-                      if hasattr(st.session_state, "api_keys") 
-                      else None) or os.environ.get(key_name)
-            if api_key:
-                settings[key_name] = api_key
+    # Add API keys to settings
+    settings.update(_api_keys)
     
     return Orchestrator(settings)
 
 # Process question
-if (ask_button or question) and question.strip():
-    
-    # Avoid duplicate processing
-    if st.session_state.chat_history and st.session_state.chat_history[-1].get("question") == question:
-        pass  # Already processed
+if (ask_button or auto_ask or st.session_state.get('auto_ask', False)) and question.strip():
+    # Reset auto_ask flag
+    if 'auto_ask' in st.session_state:
+        st.session_state.auto_ask = False
+    # Show appropriate loading message
+    if search_choice == "semantic" or search_choice == "hybrid":
+        loading_msg = "🔍 Searching (semantic analysis)... 🤔 Generating answer..."
     else:
-        # Show appropriate loading message
-        if search_choice == "semantic" or search_choice == "hybrid":
-            loading_msg = "🔍 Searching (semantic analysis)... 🤔 Generating answer..."
-        else:
-            loading_msg = "🔍 Searching Gray's Anatomy... 🤔 Generating answer..."
-        
-        with st.spinner(loading_msg):
-            try:
-                start_time = time.time()
-                
-                # Get orchestrator
-                orchestrator = get_orchestrator(
-                    _llm=llm_choice,
-                    _search=search_choice,
-                    _embedding=embedding_choice,
-                    _k=top_k
-                )
-                
-                # Query the system
-                result = orchestrator.query(question)
-                
-                end_time = time.time()
-                elapsed = end_time - start_time
-                
-                # Add to chat history
-                st.session_state.chat_history.append({
-                    "question": question,
-                    "answer": result["answer"],
-                    "sources": result["sources"],
-                    "metadata": result["metadata"],
-                    "elapsed_time": elapsed,
-                    "settings": {
-                        "llm": llm_choice,
-                        "search": search_choice,
-                        "embedding": embedding_choice if search_choice in ["semantic", "hybrid"] else None
-                    }
-                })
-                
-            except Exception as e:
-                st.error(f"❌ Error: {str(e)}")
-                
-                # Helpful debugging info
-                if "OPENAI_API_KEY" in str(e):
-                    st.info("💡 **How to fix:**")
-                    st.code('# Add to .env file:\nOPENAI_API_KEY=sk-your_key_here')
-                    st.markdown("Get key at: https://platform.openai.com/api-keys")
-                elif "ANTHROPIC_API_KEY" in str(e):
-                    st.info("💡 **How to fix:**")
-                    st.code('# Add to .env file:\nANTHROPIC_API_KEY=sk-ant-your_key_here')
-                    st.markdown("Get key at: https://console.anthropic.com/settings/keys")
+        loading_msg = "🔍 Searching Gray's Anatomy... 🤔 Generating answer..."
+    
+    with st.spinner(loading_msg):
+        try:
+            start_time = time.time()
+            
+            # Set API keys in environment from session state
+            if hasattr(st.session_state, 'api_keys'):
+                for key, value in st.session_state.api_keys.items():
+                    os.environ[key] = value
+            
+            orchestrator = get_orchestrator(
+                _llm=llm_choice,
+                _search=search_choice,
+                _embedding=embedding_choice,
+                _k=top_k,
+                _api_keys={}
+            )
+            
+            # Query the system
+            result = orchestrator.query(question)
+            
+            end_time = time.time()
+            elapsed = end_time - start_time
+            
+            # Add to chat history
+            st.session_state.chat_history.append({
+                "question": question,
+                "answer": result["answer"],
+                "sources": result["sources"],
+                "metadata": result["metadata"],
+                "elapsed_time": elapsed,
+                "settings": {
+                    "llm": llm_choice,
+                    "search": search_choice,
+                    "embedding": embedding_choice if search_choice in ["semantic", "hybrid"] else None
+                }
+            })
+            
+            # Refresh the UI to show the new response
+            st.rerun()
+            
+        except Exception as e:
+            st.error(f"❌ Error: {str(e)}")
+            
+            # Helpful debugging info
+            if "OPENAI_API_KEY" in str(e):
+                st.info("💡 **How to fix:**")
+                st.code('# Add to .env file:\nOPENAI_API_KEY=sk-your_key_here')
+                st.markdown("Get key at: https://platform.openai.com/api-keys")
+            elif "ANTHROPIC_API_KEY" in str(e):
+                st.info("💡 **How to fix:**")
+                st.code('# Add to .env file:\nANTHROPIC_API_KEY=sk-ant-your_key_here')
+                st.markdown("Get key at: https://console.anthropic.com/settings/keys")
+
+
 
 
 
