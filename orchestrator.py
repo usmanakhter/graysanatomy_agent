@@ -124,27 +124,25 @@ class Orchestrator:
         # Lazy import LLM module
         if self.llm_engine is None:
             from components.llm_hub import LLMHub
-            self.llm_engine = LLMHub(
-                model_name=self.settings["llm"]
-            )
+            # Get API keys from settings
+            llm_config = {"model_name": self.settings["llm"]}
+            if "openai_api_key" in self.settings:
+                llm_config["openai_api_key"] = self.settings["openai_api_key"]
+            if "anthropic_api_key" in self.settings:
+                llm_config["anthropic_api_key"] = self.settings["anthropic_api_key"]
+            
+            self.llm_engine = LLMHub(**llm_config)
         
         # Format context from search results
         context = "\n\n".join([
             result.get("text", "") for result in search_results
         ])
-
-        # Read generation controls from settings (safe defaults set in config)
-        temperature = float(self.settings.get("temperature", 0.0))
-        max_tokens = int(self.settings.get("max_tokens", 400))
-
         
         # Generate answer
         answer = self.llm_engine.generate(
             question=question,
             context=context,
-            graph_context=graph_context,
-             max_tokens=max_tokens,
-            temperature=temperature,
+            graph_context=graph_context
         )
         
         return answer
