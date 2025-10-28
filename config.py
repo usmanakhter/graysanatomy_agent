@@ -1,87 +1,67 @@
 """
 Configuration file for Gray's Anatomy AI Agent
-Multi-choice architecture with toggleable options
+Slice 3: Semantic + Hybrid Search with GPT/Anthropic
 """
 
 # ============================================
-# LLM OPTIONS
+# LLM OPTIONS (GPT + Anthropic only)
 # ============================================
-
 LLM_OPTIONS = {
-    "gpt-4": {
-        "model": "gpt-4-1106-preview",
-        "description": "Most capable GPT model, best for medical knowledge",
+    "gpt-4o-mini": {
+        "provider": "openai",
+        "model": "gpt-4o-mini",
+        "description": "Fast, cost-effective ($0.15/1M tokens)",
         "context_length": 128000,
-        "speed": "fast",
+        "speed": "fast"
+    },
+    "gpt-4o": {
         "provider": "openai",
-        "requires_key": "OPENAI_API_KEY"
+        "model": "gpt-4o",
+        "description": "Most capable ($2.50/1M tokens)",
+        "context_length": 128000,
+        "speed": "medium"
     },
-    "gpt-3.5": {
-        "model": "gpt-3.5-turbo-1106",
-        "description": "Fast and cost-effective",
-        "context_length": 16385,
-        "speed": "very fast",
-        "provider": "openai",
-        "requires_key": "OPENAI_API_KEY"
-    },
-    "claude-3": {
-        "model": "claude-3-opus-20240229",
-        "description": "Anthropic's most capable model",
-        "context_length": 200000,
-        "speed": "fast",
+    "claude-3-5-sonnet": {
         "provider": "anthropic",
-        "requires_key": "ANTHROPIC_API_KEY"
-    },
-    "claude-instant": {
-        "model": "claude-3-sonnet-20240229",
-        "description": "Fast, efficient Anthropic model",
+        "model": "claude-3-5-sonnet-20241022",
+        "description": "Excellent reasoning ($3/1M tokens)",
         "context_length": 200000,
-        "speed": "very fast",
+        "speed": "medium"
+    },
+    "claude-3-5-haiku": {
         "provider": "anthropic",
-        "requires_key": "ANTHROPIC_API_KEY"
+        "model": "claude-3-5-haiku-20241022",
+        "description": "Fast and affordable ($0.80/1M tokens)",
+        "context_length": 200000,
+        "speed": "fast"
     }
 }
 
-DEFAULT_LLM = "gpt-3.5"  # Default to GPT-3.5 for balance of cost/performance
-
+DEFAULT_LLM = "gpt-4o-mini"
 
 # ============================================
 # EMBEDDING OPTIONS (for semantic search)
+# LIGHTWEIGHT - NO PYTORCH!
 # ============================================
 EMBEDDING_OPTIONS = {
-    "minilm": {
-        "model_name": "sentence-transformers/all-MiniLM-L6-v2",
-        "description": "Fast, lightweight (80MB)",
-        "dimension": 384,
-        "speed": "very fast"
+    "tfidf": {
+        "model_name": "sklearn-tfidf",
+        "description": "TF-IDF vectors (LIGHTWEIGHT - 10MB, no PyTorch!)",
+        "dimension": 1000,
+        "speed": "very fast",
+        "size_mb": 10
     },
-    "bge-small": {
-        "model_name": "BAAI/bge-small-en-v1.5",
-        "description": "Better quality, small (133MB)",
-        "dimension": 384,
-        "speed": "fast"
-    },
-    "bge-base": {
-        "model_name": "BAAI/bge-base-en-v1.5",
-        "description": "High quality (438MB)",
-        "dimension": 768,
-        "speed": "medium"
-    },
-    "bge-large": {
-        "model_name": "BAAI/bge-large-en-v1.5",
-        "description": "Best quality (1.34GB)",
-        "dimension": 1024,
-        "speed": "slow"
-    },
-    "biobert": {
-        "model_name": "pritamdeka/BioBERT-mnli-snli-scinli-scitail-mednli-stsb",
-        "description": "Medical domain specialist",
-        "dimension": 768,
-        "speed": "medium"
+    "openai-small": {
+        "model_name": "text-embedding-3-small",
+        "description": "OpenAI API ($0.02/1M tokens, no local model)",
+        "dimension": 1536,
+        "speed": "fast",
+        "size_mb": 0,  # API-based
+        "provider": "openai"
     }
 }
 
-DEFAULT_EMBEDDING = "bge-base"
+DEFAULT_EMBEDDING = "tfidf"  # FREE and super lightweight!
 
 # ============================================
 # SEARCH STRATEGY OPTIONS
@@ -95,7 +75,7 @@ SEARCH_STRATEGIES = {
     },
     "semantic": {
         "name": "Semantic (Vector)",
-        "description": "Meaning-based, slower, conceptual matches",
+        "description": "Meaning-based, conceptual matches",
         "requires_embeddings": True,
         "speed": "medium"
     },
@@ -118,18 +98,7 @@ KNOWLEDGE_GRAPH_OPTIONS = {
         "description": "Standard RAG (no graph)",
         "enabled": False
     },
-    "simple": {
-        "name": "Simple Graph",
-        "description": "Entity extraction + relationships",
-        "enabled": True,
-        "method": "spacy"  # or "llm"
-    },
-    "graph-rag": {
-        "name": "Full GraphRAG",
-        "description": "Community detection + hierarchical summaries",
-        "enabled": True,
-        "method": "microsoft"  # Microsoft's GraphRAG approach
-    }
+    # Slice 4 will add more options
 }
 
 DEFAULT_KNOWLEDGE_GRAPH = "none"
@@ -150,18 +119,8 @@ TOP_K_RESULTS = 5
 HYBRID_WEIGHT_LEXICAL = 0.5  # 50% weight to lexical
 HYBRID_WEIGHT_SEMANTIC = 0.5  # 50% weight to semantic
 
-# ============================================
-# GRAPH-RAG PARAMETERS
-# ============================================
-GRAPH_ENTITY_TYPES = [
-    "ORGAN", "BONE", "MUSCLE", "NERVE", "ARTERY", 
-    "VEIN", "TISSUE", "CELL", "SYSTEM", "REGION"
-]
-
-GRAPH_RELATIONSHIP_TYPES = [
-    "CONNECTED_TO", "PART_OF", "INNERVATES", 
-    "SUPPLIES_BLOOD_TO", "LOCATED_IN", "FUNCTIONS_AS"
-]
+# Reciprocal Rank Fusion constant
+RRF_K = 60
 
 # ============================================
 # FILE PATHS
@@ -173,20 +132,25 @@ GRAPH_STORE_FILE = "indexes/knowledge_graph.pkl"
 # ============================================
 # PROMPTS
 # ============================================
-STANDARD_PROMPT = """Based on the following excerpts from Gray's Anatomy (1918), answer the question accurately.
+STANDARD_PROMPT = """You are an expert on Gray's Anatomy (1918 edition). Answer questions ONLY using the provided excerpts. Do not use any outside knowledge or information from web searches.
 
-Context:
+Context from Gray's Anatomy:
 {context}
 
 Question: {question}
 
-IMPORTANT: Use ONLY the provided excerpts above to answer. If the answer cannot be found in the provided excerpts, respond exactly with: "I don't know based on the provided context." Do NOT hallucinate or use outside knowledge.
+Instructions:
+- Base your answer EXCLUSIVELY on the context provided above
+- If the context doesn't contain enough information, say "This information is not available in the provided excerpts from Gray's Anatomy"
+- Use proper anatomical terminology from the text
+- Be precise and educational
+- Do NOT supplement with modern knowledge or external sources
 
-Provide a clear, educational answer using proper anatomical terminology:"""
+Answer:"""
 
-GRAPH_RAG_PROMPT = """You are an expert anatomist. Use the following information to answer the question:
+GRAPH_RAG_PROMPT = """You are an expert anatomist analyzing Gray's Anatomy (1918). Answer ONLY using the provided information. Do NOT use external knowledge.
 
-Text Context:
+Text Context from Gray's Anatomy:
 {context}
 
 Knowledge Graph Information:
@@ -194,7 +158,14 @@ Knowledge Graph Information:
 
 Question: {question}
 
-Synthesize information from both the text and the knowledge graph to provide a comprehensive answer:"""
+Instructions:
+- Use ONLY the text context and graph information provided
+- If information is insufficient, state this clearly
+- Do NOT add modern medical knowledge
+- Do NOT use web information or external sources
+- Synthesize only from the given context
+
+Answer:"""
 
 # ============================================
 # UI DEFAULTS
@@ -206,8 +177,3 @@ DEFAULT_SETTINGS = {
     "knowledge_graph": DEFAULT_KNOWLEDGE_GRAPH,
     "top_k": TOP_K_RESULTS
 }
-
-
-# Generation controls (allow UI or orchestrator to tweak these)
-DEFAULT_SETTINGS.setdefault("temperature", 0.0)
-DEFAULT_SETTINGS.setdefault("max_tokens", 400)

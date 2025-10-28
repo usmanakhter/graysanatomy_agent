@@ -1,13 +1,5 @@
-"""
-Components package - Modular RAG components
-"""
-from .search import SearchEngine
+from .search_lightweight import SearchEngine
 from .llm_hub import LLMHub
+from .embeddings_lightweight import EmbeddingManager
 
-__all__ = ['SearchEngine', 'LLMHub']
-
-# Slice 3+
-# from .embeddings import EmbeddingManager
-
-# Slice 4+  
-# from .graph_rag import GraphRAG
+__all__ = ['SearchEngine', 'LLMHub', 'EmbeddingManager']
