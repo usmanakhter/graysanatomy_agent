@@ -132,12 +132,19 @@ class Orchestrator:
         context = "\n\n".join([
             result.get("text", "") for result in search_results
         ])
+
+        # Read generation controls from settings (safe defaults set in config)
+        temperature = float(self.settings.get("temperature", 0.0))
+        max_tokens = int(self.settings.get("max_tokens", 400))
+
         
         # Generate answer
         answer = self.llm_engine.generate(
             question=question,
             context=context,
-            graph_context=graph_context
+            graph_context=graph_context,
+             max_tokens=max_tokens,
+            temperature=temperature,
         )
         
         return answer
