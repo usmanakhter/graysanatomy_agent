@@ -180,6 +180,8 @@ Context:
 
 Question: {question}
 
+IMPORTANT: Use ONLY the provided excerpts above to answer. If the answer cannot be found in the provided excerpts, respond exactly with: "I don't know based on the provided context." Do NOT hallucinate or use outside knowledge.
+
 Provide a clear, educational answer using proper anatomical terminology:"""
 
 GRAPH_RAG_PROMPT = """You are an expert anatomist. Use the following information to answer the question:
@@ -204,3 +206,8 @@ DEFAULT_SETTINGS = {
     "knowledge_graph": DEFAULT_KNOWLEDGE_GRAPH,
     "top_k": TOP_K_RESULTS
 }
+
+
+# Generation controls (allow UI or orchestrator to tweak these)
+DEFAULT_SETTINGS.setdefault("temperature", 0.0)
+DEFAULT_SETTINGS.setdefault("max_tokens", 400)
