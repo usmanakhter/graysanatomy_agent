@@ -176,19 +176,30 @@ with st.sidebar:
     
     # API Key Management
     st.markdown("### 🔑 API Keys")
-    
+
     # Initialize session state for API keys if not exists
     if "api_keys" not in st.session_state:
         st.session_state.api_keys = {}
-    
+
+    # Initialize API key error tracking
+    if "api_key_error" not in st.session_state:
+        st.session_state.api_key_error = None
+
     # Required API key for current model
     provider = LLM_OPTIONS[llm_choice]["provider"]
     key_name = LLM_OPTIONS[llm_choice]["requires_key"]
     key_url = LLM_OPTIONS[llm_choice]["key_url"]
-    
+
     # Check both environment and session state
     api_key = os.environ.get(key_name) or st.session_state.api_keys.get(key_name)
-    
+
+    # Force re-entry if there was an error with the current key
+    if st.session_state.api_key_error == key_name:
+        api_key = None
+        if key_name in st.session_state.api_keys:
+            del st.session_state.api_keys[key_name]
+        st.session_state.api_key_error = None
+
     if not api_key:
         st.markdown(f"#### 🔑 {provider.upper()} API Key Required")
         new_key = st.text_input(
@@ -207,7 +218,16 @@ with st.sidebar:
             st.error(f"❌ {key_name} required")
             st.stop()
     else:
-        st.success(f"✅ {provider.upper()} API configured")
+        # Show configured status with option to reset
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.success(f"✅ {provider.upper()} API configured")
+        with col2:
+            if st.button("🔄 Reset", key=f"reset_{key_name}", help="Clear and re-enter API key"):
+                # Clear the API key
+                if key_name in st.session_state.api_keys:
+                    del st.session_state.api_keys[key_name]
+                st.rerun()
     
     st.markdown("---")
     
@@ -384,17 +404,48 @@ if (ask_button or st.session_state.get('auto_ask', False)) and question.strip():
             st.rerun()
             
         except Exception as e:
+            error_str = str(e).lower()
             st.error(f"❌ Error: {str(e)}")
-            
-            # Helpful debugging info
-            if "OPENAI_API_KEY" in str(e):
-                st.info("💡 **How to fix:**")
-                st.code('# Add to .env file:\nOPENAI_API_KEY=sk-your_key_here')
-                st.markdown("Get key at: https://platform.openai.com/api-keys")
-            elif "ANTHROPIC_API_KEY" in str(e):
-                st.info("💡 **How to fix:**")
-                st.code('# Add to .env file:\nANTHROPIC_API_KEY=sk-ant-your_key_here')
-                st.markdown("Get key at: https://console.anthropic.com/settings/keys")
+
+            # Check for API key authentication errors
+            is_auth_error = any(keyword in error_str for keyword in [
+                'authentication', 'unauthorized', 'invalid api key',
+                'incorrect api key', 'invalid_api_key', '401', 'api_key'
+            ])
+
+            if is_auth_error:
+                # Determine which API key failed
+                failed_key = None
+                if LLM_OPTIONS[llm_choice]["provider"] == "openai":
+                    failed_key = "OPENAI_API_KEY"
+                elif LLM_OPTIONS[llm_choice]["provider"] == "anthropic":
+                    failed_key = "ANTHROPIC_API_KEY"
+
+                if failed_key:
+                    st.warning(f"⚠️ API key authentication failed for {failed_key}")
+                    st.info("💡 **The API key appears to be invalid or incorrect.**")
+
+                    # Mark this key as having an error (will trigger re-entry on next rerun)
+                    st.session_state.api_key_error = failed_key
+
+                    # Provide clear instructions
+                    if st.button("🔄 Re-enter API Key", type="primary"):
+                        st.rerun()
+
+                    if "openai" in failed_key.lower():
+                        st.markdown("Get a valid key at: https://platform.openai.com/api-keys")
+                    else:
+                        st.markdown("Get a valid key at: https://console.anthropic.com/settings/keys")
+            else:
+                # Generic error handling
+                if "OPENAI_API_KEY" in str(e):
+                    st.info("💡 **How to fix:**")
+                    st.code('# Add to .env file:\nOPENAI_API_KEY=sk-your_key_here')
+                    st.markdown("Get key at: https://platform.openai.com/api-keys")
+                elif "ANTHROPIC_API_KEY" in str(e):
+                    st.info("💡 **How to fix:**")
+                    st.code('# Add to .env file:\nANTHROPIC_API_KEY=sk-ant-your_key_here')
+                    st.markdown("Get key at: https://console.anthropic.com/settings/keys")
 
 
 
