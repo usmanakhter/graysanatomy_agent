@@ -6,6 +6,7 @@ Temperature = 0 for deterministic, context-only answers
 import streamlit as st
 import time
 import os
+import re
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -55,20 +56,19 @@ col1, col2 = st.columns([4, 1])
 
 with col1:
     # Check if example was selected
-    default_question = ""
-    auto_ask = False
     if "selected_example" in st.session_state:
-        default_question = st.session_state.selected_example
-        auto_ask = True
+        # Set the question_input value directly
+        if "question_input" not in st.session_state or st.session_state.question_input != st.session_state.selected_example:
+            st.session_state.question_input = st.session_state.selected_example
+        st.session_state.auto_ask = True
         del st.session_state.selected_example
-    
+
     def handle_enter():
         if st.session_state.question_input.strip():
             st.session_state.auto_ask = True
-    
+
     question = st.text_input(
         "Your question:",
-        value=default_question,
         placeholder="e.g., What are the main bones of the skull?",
         key="question_input",
         on_change=handle_enter
@@ -116,8 +116,37 @@ if st.session_state.chat_history:
             # Sources (expandable)
             with st.expander(f"📖 View {len(chat['sources'])} Retrieved Sources"):
                 for j, source in enumerate(chat['sources'], 1):
+                    # Extract question terms for highlighting
+                    question_terms = set(chat['question'].lower().split())
+                    # Remove common stopwords
+                    stopwords = {'what', 'are', 'the', 'is', 'of', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'with', 'by'}
+                    question_keywords = question_terms - stopwords
+
+                    # Find matching terms in this source
+                    source_terms = set(source['text'].lower().split())
+                    matched_terms = question_keywords.intersection(source_terms)
+
+                    # Display header with relevance info
                     st.markdown(f"**Source {j}** ({source['method']} - Score: {source['score']:.3f})")
-                    st.text(source['text'][:500] + "..." if len(source['text']) > 500 else source['text'])
+                    if matched_terms:
+                        st.caption(f"🔍 Contains: {', '.join(sorted(matched_terms)[:8])}")
+
+                    # Show longer preview (800 chars instead of 500)
+                    preview_length = 800
+                    source_text = source['text'][:preview_length]
+                    if len(source['text']) > preview_length:
+                        source_text += "..."
+
+                    # Highlight matched keywords
+                    highlighted_text = source_text
+                    for keyword in matched_terms:
+                        if len(keyword) > 2:  # Only highlight words longer than 2 chars
+                            # Case-insensitive replace with **bold**
+                            pattern = re.compile(re.escape(keyword), re.IGNORECASE)
+                            highlighted_text = pattern.sub(f"**{keyword}**", highlighted_text)
+
+                    st.markdown(highlighted_text)
+
                     if j < len(chat['sources']):
                         st.markdown("---")
             
@@ -126,21 +155,7 @@ if st.session_state.chat_history:
                 st.markdown("---")
 else:
     st.info("👆 **Get started!** Ask a question above or click an example from the sidebar.")
-    
-    st.markdown("### 🎯 What's New in Slice 3?")
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown("**🔍 Semantic Search**")
-        st.caption("Understanding meaning, not just keywords")
-    
-    with col2:
-        st.markdown("**⚡ Hybrid Search**")
-        st.caption("Best of both: keywords + semantics")
-    
-    with col3:
-        st.markdown("**🎯 Context-Only**")
-        st.caption("Temperature=0, no external knowledge")
+
 
 # Sidebar - Configuration
 with st.sidebar:
@@ -158,6 +173,41 @@ with st.sidebar:
     
     st.caption(f"Provider: {LLM_OPTIONS[llm_choice]['provider'].upper()}")
     st.caption(f"Context: {LLM_OPTIONS[llm_choice]['context_length']:,} tokens")
+    
+    # API Key Management
+    st.markdown("### 🔑 API Keys")
+    
+    # Initialize session state for API keys if not exists
+    if "api_keys" not in st.session_state:
+        st.session_state.api_keys = {}
+    
+    # Required API key for current model
+    provider = LLM_OPTIONS[llm_choice]["provider"]
+    key_name = LLM_OPTIONS[llm_choice]["requires_key"]
+    key_url = LLM_OPTIONS[llm_choice]["key_url"]
+    
+    # Check both environment and session state
+    api_key = os.environ.get(key_name) or st.session_state.api_keys.get(key_name)
+    
+    if not api_key:
+        st.markdown(f"#### 🔑 {provider.upper()} API Key Required")
+        new_key = st.text_input(
+            f"Enter your {key_name}:",
+            type="password",
+            key=f"input_{key_name}",
+            help=f"Get your API key at: {key_url}"
+        )
+        if new_key:
+            # Save to session state (temporary)
+            st.session_state.api_keys[key_name] = new_key
+            st.success(f"✅ {provider.upper()} API key saved to session")
+            api_key = new_key
+        else:
+            # No API key provided
+            st.error(f"❌ {key_name} required")
+            st.stop()
+    else:
+        st.success(f"✅ {provider.upper()} API configured")
     
     st.markdown("---")
     
@@ -250,54 +300,20 @@ with st.sidebar:
         else:
             st.warning("⏳ Will build graph (~2-5 min first time)")
     
-    # API Key Management
-    st.markdown("### 🔑 API Keys")
-    
-    # Initialize session state for API keys if not exists
-    if "api_keys" not in st.session_state:
-        st.session_state.api_keys = {}
-    
-    # Required API key for current model
-    provider = LLM_OPTIONS[llm_choice]["provider"]
-    key_name = LLM_OPTIONS[llm_choice]["requires_key"]
-    key_url = LLM_OPTIONS[llm_choice]["key_url"]
-    
-    # Check both environment and session state
-    api_key = os.environ.get(key_name) or st.session_state.api_keys.get(key_name)
-    
-    if not api_key:
-        st.markdown(f"#### 🔑 {provider.upper()} API Key Required")
-        new_key = st.text_input(
-            f"Enter your {key_name}:",
-            type="password",
-            key=f"input_{key_name}",
-            help=f"Get your API key at: {key_url}"
-        )
-        if new_key:
-            # Save to session state (temporary)
-            st.session_state.api_keys[key_name] = new_key
-            st.success(f"✅ {provider.upper()} API key saved to session")
-            api_key = new_key
-        else:
-            # No API key provided
-            st.error(f"❌ {key_name} required")
-            st.stop()
-    else:
-        st.success(f"✅ {provider.upper()} API configured")
-    
-    st.markdown("---")
+ 
     
     # Example questions
     st.subheader("💡 Example Questions")
     examples = [
-        "WWhat are the sympathetic efferent fibers?",
+        "What are the sympathetic efferent fibers?",
         "What protects the skull?",
-        "Why does my leg hurt in the back?"
+        "What bones form the hand?"
     ]
-    
+
     for i, example in enumerate(examples):
         if st.button(example, key=f"ex_{i}", use_container_width=True):
             st.session_state.selected_example = example
+            st.rerun()
 
 # Initialize orchestrator with current settings
 def get_orchestrator(_llm, _search, _embedding, _k, _kg, _api_keys):
@@ -316,7 +332,7 @@ def get_orchestrator(_llm, _search, _embedding, _k, _kg, _api_keys):
     return Orchestrator(settings)
 
 # Process question
-if (ask_button or auto_ask or st.session_state.get('auto_ask', False)) and question.strip():
+if (ask_button or st.session_state.get('auto_ask', False)) and question.strip():
     # Reset auto_ask flag
     if 'auto_ask' in st.session_state:
         st.session_state.auto_ask = False
