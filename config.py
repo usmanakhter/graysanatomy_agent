@@ -106,7 +106,18 @@ KNOWLEDGE_GRAPH_OPTIONS = {
         "description": "Standard RAG (no graph)",
         "enabled": False
     },
-    # Slice 4 will add more options
+    "entity": {
+        "name": "Entity Graph",
+        "description": "Entity-based graph traversal (finds related anatomical terms)",
+        "enabled": True,
+        "requires_spacy": True
+    },
+    "community": {
+        "name": "Community Graph",
+        "description": "Community detection for hierarchical context (groups related concepts)",
+        "enabled": True,
+        "requires_spacy": True
+    }
 }
 
 DEFAULT_KNOWLEDGE_GRAPH = "none"

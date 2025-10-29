@@ -2,15 +2,16 @@
 
 Intelligent anatomy question-answering system using RAG (Retrieval-Augmented Generation) architecture.
 
-## 🎯 Current Status: **Slice 1 Complete** ✅
+## 🎯 Current Status: **Slice 4 Complete** ✅
 
 ### What's Working:
 - ✅ **Question Answering**: Ask any anatomy question
-- ✅ **BM25 Search**: Fast keyword-based retrieval
-- ✅ **Mistral-7B LLM**: Free HuggingFace API
+- ✅ **Multiple Search Strategies**: Lexical (BM25), Semantic (TF-IDF/OpenAI), Hybrid (RRF)
+- ✅ **Multiple LLMs**: OpenAI (GPT-4o, GPT-4o-mini), Anthropic (Claude 3.5 Sonnet/Haiku)
+- ✅ **Knowledge Graph**: Entity extraction, relationship detection, graph traversal
 - ✅ **Source Attribution**: See which text chunks were used
 - ✅ **Performance Metrics**: Track response times
-- ✅ **100% Free**: No paid APIs
+- ✅ **Lightweight Design**: Works on 8GB RAM, no PyTorch
 
 ## 🚀 Quick Start
 
@@ -21,20 +22,27 @@ cd graysanatomy_agent
 ```
 
 ### 2. Install Dependencies
+
+**Option A: Quick Setup (Recommended)**
+```bash
+chmod +x setup_slice4.sh
+./setup_slice4.sh
+```
+
+**Option B: Manual Setup**
 ```bash
 pip install -r requirements.txt
+python -m spacy download en_core_web_sm
+python test_graph.py  # Verify installation
 ```
 
-### 3. Set API Token
-Get a free token at https://huggingface.co/settings/tokens
+### 3. Set API Keys
+Create a `.env` file in the project root:
 
-**Local Development:**
 ```bash
-```
-
-**Streamlit Cloud:**
-Add to Settings → Secrets:
-```toml
+# Required: Choose at least one
+OPENAI_API_KEY=sk-...              # Get at: https://platform.openai.com/api-keys
+ANTHROPIC_API_KEY=sk-ant-...       # Get at: https://console.anthropic.com/settings/keys
 ```
 
 ### 4. Run Application
@@ -44,7 +52,8 @@ streamlit run app.py
 
 ### 5. First Run
 - Downloads Gray's Anatomy text (~30 seconds)
-- Builds BM25 search index (~2 minutes)
+- Builds BM25 search index (~1 minute)
+- If using knowledge graph: builds graph (~2-5 minutes)
 - Subsequent runs are instant!
 
 ## 📁 Project Structure
@@ -72,32 +81,32 @@ graysanatomy_agent/
 
 ## 🗺️ Roadmap
 
-### ✅ Slice 1: Core System (CURRENT)
+### ✅ Slice 1: Core System
 - [x] Basic RAG pipeline
 - [x] BM25 lexical search
 - [x] Single LLM (Mistral-7B)
 - [x] Streamlit UI
 - [x] Source attribution
 
-### 🔄 Slice 2: Multiple LLMs (NEXT)
-- [ ] Add 5 more LLM options
-- [ ] Mistral-7B, Mixtral-8x7B
-- [ ] Zephyr-7B, Llama-3.1-8B
-- [ ] Phi-3-Mini, BioMedLM
-- [ ] Dropdown selector in UI
+### ✅ Slice 2: Multiple LLMs
+- [x] OpenAI (GPT-4o, GPT-4o-mini)
+- [x] Anthropic (Claude 3.5 Sonnet, Claude 3.5 Haiku)
+- [x] Dropdown selector in UI
+- [x] Temperature=0 for deterministic answers
 
-### 📋 Slice 3: Advanced Search
-- [ ] Semantic search (FAISS + embeddings)
-- [ ] 5 embedding model options
-- [ ] Hybrid search (BM25 + Vector + RRF)
-- [ ] Search strategy selector
+### ✅ Slice 3: Advanced Search
+- [x] Semantic search (TF-IDF/OpenAI embeddings)
+- [x] Hybrid search (BM25 + Vector + RRF)
+- [x] Search strategy selector
+- [x] Lightweight (no PyTorch)
 
-### 🕸️ Slice 4: Knowledge Graph
-- [ ] Entity extraction (spaCy)
-- [ ] Relationship detection
-- [ ] Simple graph (NetworkX)
-- [ ] Full GraphRAG (community detection)
-- [ ] Graph visualization
+### ✅ Slice 4: Knowledge Graph (CURRENT)
+- [x] Entity extraction (spaCy + pattern-based)
+- [x] Relationship detection (co-occurrence)
+- [x] Graph construction (NetworkX)
+- [x] GraphRAG (entity & community modes)
+- [x] Toggle-able (3 modes: none/entity/community)
+- [ ] Graph visualization (future enhancement)
 
 ## 🎨 Features by Slice
 
@@ -114,16 +123,33 @@ graysanatomy_agent/
 
 ## 💡 Example Usage
 
+### Standard RAG (Knowledge Graph: None)
 ```python
 # Ask a question
 "What are the main bones of the skull?"
 
 # System automatically:
-1. Searches Gray's Anatomy text (BM25)
+1. Searches Gray's Anatomy text (lexical/semantic/hybrid)
 2. Retrieves top 5 relevant chunks
-3. Sends to Mistral-7B with context
+3. Sends to LLM (GPT/Claude) with context
 4. Returns comprehensive answer
 5. Shows sources used
+```
+
+### Graph RAG (Knowledge Graph: Entity/Community)
+```python
+# Ask a question
+"What connects to the temporal bone?"
+
+# System automatically:
+1. Searches Gray's Anatomy text (lexical/semantic/hybrid)
+2. Retrieves top 5 relevant chunks
+3. Extracts entities from question and results
+4. Traverses knowledge graph to find related entities
+5. Adds graph context (entities, relationships)
+6. Sends to LLM with both text + graph context
+7. Returns enriched answer
+8. Shows sources AND graph relationships
 ```
 
 ## 🔧 Configuration
@@ -138,20 +164,34 @@ CHUNK_OVERLAP = 200        # Overlap between chunks
 # Retrieval
 TOP_K_RESULTS = 5          # Number of chunks to retrieve
 
-# LLM (Slice 2+)
-DEFAULT_LLM = "mistral-7b"
+# LLM Options
+DEFAULT_LLM = "gpt-4o-mini"           # or "gpt-4o", "claude-3-5-sonnet", "claude-3-5-haiku"
 
-# Search (Slice 3+)
-DEFAULT_SEARCH_STRATEGY = "hybrid"
+# Search Strategy
+DEFAULT_SEARCH_STRATEGY = "hybrid"     # or "lexical", "semantic"
+DEFAULT_EMBEDDING = "tfidf"            # or "openai-small"
+
+# Knowledge Graph (Slice 4)
+DEFAULT_KNOWLEDGE_GRAPH = "none"       # or "entity", "community"
 ```
+
+See [KNOWLEDGE_GRAPH_SETUP.md](KNOWLEDGE_GRAPH_SETUP.md) for detailed knowledge graph documentation.
 
 ## 📊 Performance
 
-**Slice 1 Metrics:**
-- First query: ~5-7 seconds (including model warmup)
-- Subsequent queries: ~2-3 seconds
-- Index build time: ~2 minutes (one-time)
-- Memory usage: ~300 MB
+**Slice 4 Metrics:**
+- **Query time**: 1-3 seconds (after indexes built)
+- **Index build time** (one-time):
+  - BM25: ~1 minute
+  - TF-IDF vectors: ~2-3 minutes
+  - Knowledge graph: ~2-5 minutes
+- **Memory usage**:
+  - Base system: ~200 MB
+  - With graph: ~300-400 MB
+- **Disk storage**:
+  - BM25 index: ~10 MB
+  - TF-IDF vectors: ~15 MB
+  - Knowledge graph: ~20-50 MB
 
 ## 🌐 Deployment
 
@@ -197,14 +237,18 @@ MIT License - Feel free to use and modify!
 ## 🙏 Acknowledgments
 
 - **Gray's Anatomy (1918)** - Public domain medical text
-- **HuggingFace** - Free LLM inference API
+- **OpenAI** - GPT models
+- **Anthropic** - Claude models
+- **spaCy** - Lightweight NLP for entity extraction
+- **NetworkX** - Graph algorithms
 - **Streamlit** - Excellent Python web framework
 
 ## 📧 Support
 
-Questions? Issues? 
+Questions? Issues?
 - Open a GitHub issue
-- Check the [ARCHITECTURE.md](ARCHITECTURE.md) for design details
+- Check [KNOWLEDGE_GRAPH_SETUP.md](KNOWLEDGE_GRAPH_SETUP.md) for graph documentation
+- Review [config.py](config.py) for all configuration options
 
 ---
 

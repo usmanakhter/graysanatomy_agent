@@ -83,24 +83,47 @@ class Orchestrator:
     def _get_graph_context(self, question: str, search_results: List[Dict]) -> Dict[str, Any]:
         """
         Get knowledge graph context if enabled
-        
+
         Args:
             question: User's question
             search_results: Retrieved document chunks
-            
+
         Returns:
             Graph context or None
         """
         if self.settings["knowledge_graph"] == "none":
             return None
-        
+
         # Lazy import graph module
         if self.graph_engine is None:
+            import os
             from components.graph_rag import GraphRAG
+            from config import GRAPH_STORE_FILE
+            from data.loader import load_and_chunk
+
             self.graph_engine = GraphRAG(
                 mode=self.settings["knowledge_graph"]
             )
-        
+
+            # Load or build graph
+            if os.path.exists(GRAPH_STORE_FILE):
+                print(f"Loading knowledge graph from {GRAPH_STORE_FILE}...")
+                self.graph_engine.load(GRAPH_STORE_FILE)
+            else:
+                print("Building knowledge graph (this may take 2-5 minutes)...")
+                chunks = load_and_chunk()
+
+                # Progress callback
+                def progress(current, total):
+                    if current % 500 == 0:
+                        print(f"  Processed {current}/{total} chunks...")
+
+                self.graph_engine.build_graph(chunks, progress_callback=progress)
+                self.graph_engine.save(GRAPH_STORE_FILE)
+                print(f"✓ Knowledge graph built and saved")
+                stats = self.graph_engine.get_stats()
+                print(f"  Entities: {stats['num_entities']}, Relationships: {stats['num_relationships']}")
+
         graph_context = self.graph_engine.get_context(question, search_results)
         return graph_context
     
