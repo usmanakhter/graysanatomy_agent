@@ -13,10 +13,11 @@ load_dotenv()
 
 from orchestrator import Orchestrator
 from config import (
-    DEFAULT_SETTINGS, 
-    LLM_OPTIONS, 
-    EMBEDDING_OPTIONS, 
-    SEARCH_STRATEGIES
+    DEFAULT_SETTINGS,
+    LLM_OPTIONS,
+    EMBEDDING_OPTIONS,
+    SEARCH_STRATEGIES,
+    KNOWLEDGE_GRAPH_OPTIONS
 )
 
 # Page config
@@ -45,7 +46,7 @@ st.markdown("""
 # Header
 st.title("🧠 Gray's Anatomy AI Assistant")
 st.markdown("""
-Ask questions about human anatomy based on **Gray's Anatomy (1918 edition)**.  
+Ask questions about human anatomy based on **[Gray's Anatomy (1918 edition)](https://archive.org/stream/anatomyofhumanbo1918gray/anatomyofhumanbo1918gray_djvu.txt")**.  
 **Answers are derived ONLY from the provided text** (Temperature = 0, no external knowledge).
 """)
 
@@ -189,7 +190,24 @@ with st.sidebar:
             st.caption(f"Size: {EMBEDDING_OPTIONS[embedding_choice]['size_mb']}MB")
     
     st.markdown("---")
-    
+
+    # Knowledge Graph Selection
+    st.markdown("### 🕸️ Knowledge Graph")
+    kg_choice = st.selectbox(
+        "Select graph mode:",
+        options=list(KNOWLEDGE_GRAPH_OPTIONS.keys()),
+        format_func=lambda x: f"{KNOWLEDGE_GRAPH_OPTIONS[x]['name']} - {KNOWLEDGE_GRAPH_OPTIONS[x]['description']}",
+        index=list(KNOWLEDGE_GRAPH_OPTIONS.keys()).index(DEFAULT_SETTINGS["knowledge_graph"]),
+        key="kg_select"
+    )
+
+    if kg_choice != "none":
+        st.caption("⚡ Adds entity/relationship context to search results")
+        if KNOWLEDGE_GRAPH_OPTIONS[kg_choice].get("requires_spacy"):
+            st.caption("📦 Requires: spaCy + NetworkX")
+
+    st.markdown("---")
+
     # Advanced settings
     with st.expander("⚙️ Advanced Settings"):
         top_k = st.slider(
@@ -199,9 +217,9 @@ with st.sidebar:
             value=DEFAULT_SETTINGS["top_k"],
             help="How many text chunks to retrieve"
         )
-        
+
         st.info("🌡️ Temperature: **0.0** (deterministic, context-only answers)")
-    
+
     st.markdown("---")
     
     # System status
@@ -225,6 +243,12 @@ with st.sidebar:
             st.success(f"✅ Vector index ready ({embedding_choice})")
         else:
             st.warning(f"⏳ Will build vector index (~5-10 min first time)")
+
+    if kg_choice != "none":
+        if os.path.exists("indexes/knowledge_graph.pkl"):
+            st.success("✅ Knowledge graph ready")
+        else:
+            st.warning("⏳ Will build graph (~2-5 min first time)")
     
     # API Key Management
     st.markdown("### 🔑 API Keys")
@@ -276,19 +300,19 @@ with st.sidebar:
             st.session_state.selected_example = example
 
 # Initialize orchestrator with current settings
-def get_orchestrator(_llm, _search, _embedding, _k, _api_keys):
+def get_orchestrator(_llm, _search, _embedding, _k, _kg, _api_keys):
     """Initialize orchestrator with current settings"""
     settings = {
         "llm": _llm,
         "search_strategy": _search,
         "embedding": _embedding,
         "top_k": _k,
-        "knowledge_graph": "none",
+        "knowledge_graph": _kg,
     }
-    
+
     # Add API keys to settings
     settings.update(_api_keys)
-    
+
     return Orchestrator(settings)
 
 # Process question
@@ -316,6 +340,7 @@ if (ask_button or auto_ask or st.session_state.get('auto_ask', False)) and quest
                 _search=search_choice,
                 _embedding=embedding_choice,
                 _k=top_k,
+                _kg=kg_choice,
                 _api_keys={}
             )
             
@@ -362,9 +387,9 @@ if (ask_button or auto_ask or st.session_state.get('auto_ask', False)) and quest
 # Footer
 st.markdown("---")
 st.caption("""
-**Slice 3 Status:** ✅ All search strategies operational  
-**Temperature:** 0.0 (deterministic, context-only answers)  
-**Next:** Slice 4 (Knowledge Graph + GraphRAG)
+**Slice 4 Status:** ✅ Knowledge Graph + GraphRAG operational
+**Temperature:** 0.0 (deterministic, context-only answers)
+**Features:** Lexical, Semantic, Hybrid Search + Entity/Community Graph RAG
 
 ⚠️ **Note:** This uses Gray's Anatomy (1918). Answers are based EXCLUSIVELY on the provided text.
 Always consult current medical resources for clinical decisions.
