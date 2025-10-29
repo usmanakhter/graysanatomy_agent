@@ -211,16 +211,13 @@ with st.sidebar:
         placeholder="sk-... (paste your API key here)"
     )
 
-    # Handle reset button
+    # Show status and reset button
     if api_key:
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            st.success(f"✅ API key configured")
-        with col2:
-            if st.button("🔄 Reset", key=f"reset_{key_name}", help="Clear current API key"):
-                if key_name in st.session_state.api_keys:
-                    del st.session_state.api_keys[key_name]
-                st.rerun()
+        st.success(f"✅ API key configured")
+        if st.button("🔄 Reset API Key", key=f"reset_{key_name}", help="Clear current API key and re-enter"):
+            if key_name in st.session_state.api_keys:
+                del st.session_state.api_keys[key_name]
+            st.rerun()
 
     # Save new key if provided
     if new_key and new_key != api_key:
