@@ -2,17 +2,6 @@
 
 Intelligent anatomy question-answering system using RAG (Retrieval-Augmented Generation) architecture.
 
-## 🎯 Current Status: **Slice 4 Complete** ✅
-
-### What's Working:
-- ✅ **Question Answering**: Ask any anatomy question
-- ✅ **Multiple Search Strategies**: Lexical (BM25), Semantic (TF-IDF/OpenAI), Hybrid (RRF)
-- ✅ **Multiple LLMs**: OpenAI (GPT-4o, GPT-4o-mini), Anthropic (Claude 3.5 Sonnet/Haiku)
-- ✅ **Knowledge Graph**: Entity extraction, relationship detection, graph traversal
-- ✅ **Source Attribution**: See which text chunks were used
-- ✅ **Performance Metrics**: Track response times
-- ✅ **Lightweight Design**: Works on 8GB RAM, no PyTorch
-
 ## 🚀 Quick Start
 
 ### 1. Clone Repository
@@ -37,7 +26,7 @@ python test_graph.py  # Verify installation
 ```
 
 ### 3. Set API Keys
-Create a `.env` file in the project root:
+Create a `.env` file in the project root OR add it in the app UI:
 
 ```bash
 # Required: Choose at least one
@@ -78,48 +67,6 @@ graysanatomy_agent/
     ├── vector_store/
     └── knowledge_graph.pkl
 ```
-
-## 🗺️ Roadmap
-
-### ✅ Slice 1: Core System
-- [x] Basic RAG pipeline
-- [x] BM25 lexical search
-- [x] Single LLM (Mistral-7B)
-- [x] Streamlit UI
-- [x] Source attribution
-
-### ✅ Slice 2: Multiple LLMs
-- [x] OpenAI (GPT-4o, GPT-4o-mini)
-- [x] Anthropic (Claude 3.5 Sonnet, Claude 3.5 Haiku)
-- [x] Dropdown selector in UI
-- [x] Temperature=0 for deterministic answers
-
-### ✅ Slice 3: Advanced Search
-- [x] Semantic search (TF-IDF/OpenAI embeddings)
-- [x] Hybrid search (BM25 + Vector + RRF)
-- [x] Search strategy selector
-- [x] Lightweight (no PyTorch)
-
-### ✅ Slice 4: Knowledge Graph (CURRENT)
-- [x] Entity extraction (spaCy + pattern-based)
-- [x] Relationship detection (co-occurrence)
-- [x] Graph construction (NetworkX)
-- [x] GraphRAG (entity & community modes)
-- [x] Toggle-able (3 modes: none/entity/community)
-- [ ] Graph visualization (future enhancement)
-
-## 🎨 Features by Slice
-
-| Feature | Slice 1 | Slice 2 | Slice 3 | Slice 4 |
-|---------|---------|---------|---------|---------|
-| **Question Answering** | ✅ | ✅ | ✅ | ✅ |
-| **Lexical Search** | ✅ | ✅ | ✅ | ✅ |
-| **Semantic Search** | ❌ | ❌ | ✅ | ✅ |
-| **Hybrid Search** | ❌ | ❌ | ✅ | ✅ |
-| **Single LLM** | ✅ | ❌ | ❌ | ❌ |
-| **Multiple LLMs** | ❌ | ✅ | ✅ | ✅ |
-| **Knowledge Graph** | ❌ | ❌ | ❌ | ✅ |
-| **Graph Visualization** | ❌ | ❌ | ❌ | ✅ |
 
 ## 💡 Example Usage
 
@@ -193,46 +140,6 @@ See [KNOWLEDGE_GRAPH_SETUP.md](KNOWLEDGE_GRAPH_SETUP.md) for detailed knowledge 
   - TF-IDF vectors: ~15 MB
   - Knowledge graph: ~20-50 MB
 
-## 🌐 Deployment
-
-### Streamlit Cloud (Free)
-1. Push to GitHub
-2. Connect at share.streamlit.io
-3. Add `HUGGINGFACEHUB_API_TOKEN` in Secrets
-4. Deploy!
-
-**Limitations:**
-- 1GB RAM (fine for Slice 1-2)
-- May struggle with Slice 3-4
-- Consider HuggingFace Spaces for advanced features
-
-### HuggingFace Spaces (Better for ML)
-1. Create Space at huggingface.co/spaces
-2. Upload code
-3. Add `HUGGINGFACEHUB_API_TOKEN` secret
-4. Automatic deployment
-
-**Benefits:**
-- 16GB RAM
-- Better for embeddings & graphs
-- Free tier available
-
-## 🤝 Contributing
-
-This is a vertical slice architecture:
-1. Each slice is fully functional
-2. New features add horizontal choices
-3. Easy to understand and extend
-
-To add a new feature:
-1. Determine which slice it belongs to
-2. Update relevant component
-3. Add option to `config.py`
-4. Update UI dropdown in `app.py`
-
-## 📝 License
-
-MIT License - Feel free to use and modify!
 
 ## 🙏 Acknowledgments
 
@@ -242,14 +149,3 @@ MIT License - Feel free to use and modify!
 - **spaCy** - Lightweight NLP for entity extraction
 - **NetworkX** - Graph algorithms
 - **Streamlit** - Excellent Python web framework
-
-## 📧 Support
-
-Questions? Issues?
-- Open a GitHub issue
-- Check [KNOWLEDGE_GRAPH_SETUP.md](KNOWLEDGE_GRAPH_SETUP.md) for graph documentation
-- Review [config.py](config.py) for all configuration options
-
----
-
-**Built with ❤️ using Vertical Slice Architecture**
