@@ -193,41 +193,46 @@ with st.sidebar:
     # Check both environment and session state
     api_key = os.environ.get(key_name) or st.session_state.api_keys.get(key_name)
 
-    # Force re-entry if there was an error with the current key
+    # Clear key if there was an authentication error
     if st.session_state.api_key_error == key_name:
-        api_key = None
         if key_name in st.session_state.api_keys:
             del st.session_state.api_keys[key_name]
         st.session_state.api_key_error = None
+        api_key = None
 
-    if not api_key:
-        st.markdown(f"#### 🔑 {provider.upper()} API Key Required")
-        new_key = st.text_input(
-            f"Enter your {key_name}:",
-            type="password",
-            key=f"input_{key_name}",
-            help=f"Get your API key at: {key_url}"
-        )
-        if new_key:
-            # Save to session state (temporary)
-            st.session_state.api_keys[key_name] = new_key
-            st.success(f"✅ {provider.upper()} API key saved to session")
-            api_key = new_key
-        else:
-            # No API key provided
-            st.error(f"❌ {key_name} required")
-            st.stop()
-    else:
-        # Show configured status with option to reset
+    # Always show the input field
+    st.markdown(f"**{provider.upper()} API Key**")
+    new_key = st.text_input(
+        f"Enter your {key_name}:",
+        type="password",
+        value="",
+        key=f"input_{key_name}",
+        help=f"Get your API key at: {key_url}",
+        placeholder="sk-... (paste your API key here)"
+    )
+
+    # Handle reset button
+    if api_key:
         col1, col2 = st.columns([3, 1])
         with col1:
-            st.success(f"✅ {provider.upper()} API configured")
+            st.success(f"✅ API key configured")
         with col2:
-            if st.button("🔄 Reset", key=f"reset_{key_name}", help="Clear and re-enter API key"):
-                # Clear the API key
+            if st.button("🔄 Reset", key=f"reset_{key_name}", help="Clear current API key"):
                 if key_name in st.session_state.api_keys:
                     del st.session_state.api_keys[key_name]
                 st.rerun()
+
+    # Save new key if provided
+    if new_key and new_key != api_key:
+        st.session_state.api_keys[key_name] = new_key
+        api_key = new_key
+        st.success(f"✅ {provider.upper()} API key saved to session")
+
+    # Check if we have a valid key
+    if not api_key:
+        st.warning(f"⚠️ {key_name} required to use this model")
+        st.markdown(f"[Get API key]({key_url})")
+        st.stop()
     
     st.markdown("---")
     
